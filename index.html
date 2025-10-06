@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Quiz Game</title>
+  <style>
+    :root{
+      --bg:#FFF7F0; --card:#FFFFFF; --accent:#FF6B6B; --accent-2:#4ECDC4; --muted:#6B7280;
+      --success:#16A34A; --danger:#DC2626; --shadow: 0 6px 18px rgba(16,24,40,0.08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; padding:24px; background:linear-gradient(180deg,var(--bg),#FFF); display:flex; align-items:center; justify-content:center;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+    .wrap{width:100%;max-width:820px}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+    .logo{width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:20px;box-shadow:var(--shadow)}
+    h1{margin:0;font-size:20px}
+    p.lead{margin:0;color:var(--muted);font-size:14px}
+
+    .card{background:var(--card);border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+    .question-count{font-size:13px;color:var(--muted);margin-bottom:6px}
+    .question{text-align:left;font-size:18px;margin:6px 0 18px}
+
+    .options{display:grid;grid-template-columns:1fr;gap:12px}
+    .option{border-radius:12px;padding:12px 14px;border:1px solid rgba(0,0,0,0.06);cursor:pointer;user-select:none}
+    .option input{display:none}
+    .option .label{display:flex;align-items:center;gap:12px}
+    .option .dot{min-width:34px;min-height:34px;border-radius:10px;background:linear-gradient(180deg,#fff,#fff);display:flex;align-items:center;justify-content:center;font-weight:700}
+    .option.selected{background:linear-gradient(90deg,#FEF3F2,#FFF7F0);border-color:rgba(255,107,107,0.2)}
+
+    .controls{Display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:18px}
+    .btn{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:600}
+    .btn-primary{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;box-shadow:0 6px 20px rgba(78,204,196,0.12)}
+    .btn-ghost{background:transparent;border:1px solid rgba(16,24,40,0.06)}
+    .progress{height:10px;background:#F3F4F6;border-radius:999px;overflow:hidden;flex:1;margin-left:12px}
+    .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));width:0%}
+
+    .result{display:none;flex-direction:column;align-items:center;gap:10px;padding:30px}
+    .score{font-size:42px;font-weight:800}
+    .emoji{font-size:36px}
+
+    footer{margin-top:12px;text-align:center;color:var(--muted);font-size:13px}
+
+    /* small screens */
+    @media (max-width:480px){body{padding:16px} .question{font-size:16px} .logo{width:56px;height:56px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">AI</div>
+      <div>
+        <h1>เกมตอบคำถามเรื่องปัญญาประดิษฐ์</h1>
+        <p class="lead">5 คำถามสั้น ๆ — ทำให้เสร็จเพื่อดูคะแนนของคุณ! เหมาะกับมือถือ</p>
+      </div>
+    </header>
+
+    <main class="card" id="game">
+      <div id="quiz-area">
+        <div class="question-count" id="qcount">คำถาม 1 จาก 5</div>
+        <div class="question" id="questionText">กำลังโหลด...</div>
+        <div class="options" id="options"></div>
+
+        <div class="controls">
+          <button class="btn btn-ghost" id="skipBtn">ข้าม</button>
+          <div style="display:flex;align-items:center;flex:1">
+            <div class="progress" aria-hidden="true"><i id="progressBar"></i></div>
+            <button class="btn btn-primary" id="nextBtn">ยืนยัน / ถัดไป</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="result" class="result" role="status" aria-live="polite">
+        <div class="emoji" id="resultEmoji">🎉</div>
+        <div class="score" id="finalScore">0 / 5</div>
+        <div id="resultText" style="color:var(--muted)"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-primary" id="retryBtn">เล่นใหม่</button>
+          <button class="btn btn-ghost" id="reviewBtn">ดูคำตอบ</button>
+        </div>
+      </div>
+    </main>
+
+    <footer>เสียงเอฟเฟกต์ภายในเบราว์เซอร์ — ปลอดภัยและไม่ต้องดาวน์โหลด</footer>
+  </div>
+
+  <script>
+    // Questions (5) - Thai language
+    const questions = [
+      {
+        q: 'ปัญญาประดิษฐ์ (AI) หมายถึงอะไร?',
+        options: ['โปรแกรมที่ทำงานแบบอัตโนมัติโดยไม่มีการเรียนรู้','ระบบที่จำลองความสามารถทางปัญญาของมนุษย์','ฮาร์ดแวร์สำหรับส่งสัญญาณอินเทอร์เน็ต','ภาษาโปรแกรมเดียวสำหรับหุ่นยนต์'],
+        a: 1
+      },
+      {
+        q: 'Machine Learning (การเรียนรู้ของเครื่อง) เป็นสาขาของ AI ที่เน้นอะไร?',
+        options: ['ออกแบบวงจรอิเล็กทรอนิกส์','ให้คอมพิวเตอร์เรียนรู้จากข้อมูล','สร้างแอปมือถือ','วาดภาพศิลปะด้วยมือ'],
+        a: 1
+      },
+      {
+        q: 'คำว่า "ปัญญาประดิษฐ์" มีความเสี่ยงด้านใดต่อสังคม?',
+        options: ['การทดแทนงานบางอาชีพ','การเพิ่มพลังชีวิตแก่ทุกคนทันที','การทิ้งขยะอิเล็กทรอนิกส์เพิ่มขึ้นเสมอ','ไม่มีผลกระทบใดๆ'],
+        a: 0
+      },
+      {
+        q: 'โมเดลภาษา (เช่น ChatGPT) ถูกฝึกด้วยข้อมูลประเภทใด?',
+        options: ['ข้อมูลตัวเลขจากเครื่องวัดอุณหภูมิเท่านั้น','ชุดข้อมูลข้อความจำนวนมากจากอินเทอร์เน็ต เอกสาร และบทความ','ภาพถ่ายความละเอียดต่ำเท่านั้น','เสียงเพลงเท่านั้น'],
+        a: 1
+      },
+      {
+        q: 'อะไรคือหลักการสำคัญเมื่อต้องออกแบบ AI ที่ปลอดภัย?',
+        options: ['โปร่งใส ตรวจสอบได้ และรับผิดชอบ','ปิดบังวิธีการทำงานไม่ให้ใครรู้','ลดประสิทธิภาพเพื่อลดค่าใช้จ่าย','ทำให้ใช้ได้เฉพาะผู้พัฒนาเท่านั้น'],
+        a: 0
+      }
+    ];
+
+    // State
+    let idx = 0; let score = 0; let selected = null; const total = questions.length;
+
+    // Elements
+    const qcount = document.getElementById('qcount');
+    const qtext = document.getElementById('questionText');
+    const optionsEl = document.getElementById('options');
+    const nextBtn = document.getElementById('nextBtn');
+    const skipBtn = document.getElementById('skipBtn');
+    const progressBar = document.getElementById('progressBar');
+    const result = document.getElementById('result');
+    const quizArea = document.getElementById('quiz-area');
+    const finalScore = document.getElementById('finalScore');
+    const resultText = document.getElementById('resultText');
+    const resultEmoji = document.getElementById('resultEmoji');
+    const retryBtn = document.getElementById('retryBtn');
+    const reviewBtn = document.getElementById('reviewBtn');
+
+    // --- Audio using Web Audio API (no external files) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, duration=0.12, type='sine'){
+      const now = audioCtx.currentTime; const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, now);
+      g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(0.12, now+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, now+duration);
+      o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+duration+0.02);
+    }
+    function playCorrect(){ playTone(880,0.12,'sine'); playTone(1320,0.08,'sine'); }
+    function playWrong(){ playTone(220,0.18,'triangle'); }
+
+    // Accessibility: allow keyboard navigation
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter') nextBtn.click();
+      if(e.key === 'ArrowRight') nextQuestion();
+    });
+
+    function renderQuestion(){
+      selected = null; optionsEl.innerHTML='';
+      const item = questions[idx];
+      qcount.textContent = `คำถาม ${idx+1} จาก ${total}`;
+      qtext.textContent = item.q;
+      // create option elements
+      item.options.forEach((opt,i)=>{
+        const div = document.createElement('label'); div.className='option'; div.tabIndex=0;
+        div.innerHTML = `
+          <div class=label>
+            <div class="dot">${String.fromCharCode(65+i)}</div>
+            <div style="flex:1">${opt}</div>
+          </div>`;
+        div.addEventListener('click',()=> selectOption(div,i));
+        div.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter' || ev.key===' ') { ev.preventDefault(); selectOption(div,i);} });
+        optionsEl.appendChild(div);
+      });
+
+      // update progress
+      updateProgress();
+    }
+
+    function selectOption(el,i){
+      // clear previous
+      const children = optionsEl.querySelectorAll('.option');
+      children.forEach(c=>c.classList.remove('selected'));
+      el.classList.add('selected'); selected = i;
+    }
+
+    function updateProgress(){
+      const pct = Math.round(((idx)/total)*100);
+      progressBar.style.width = pct + '%';
+    }
+
+    nextBtn.addEventListener('click', ()=>{
+      submitAnswer();
+    });
+
+    skipBtn.addEventListener('click', ()=>{
+      nextQuestion();
+    });
+
+    function submitAnswer(){
+      const correctIndex = questions[idx].a;
+      if(selected === null){
+        // if nothing selected, treat as wrong but let user know
+        flashMessage('กรุณาเลือกคำตอบก่อน (หรือกดข้าม)', false);
+        playWrong();
+        return;
+      }
+      // evaluate
+      const isCorrect = (selected === correctIndex);
+      if(isCorrect){ score++; playCorrect(); }
+      else { playWrong(); }
+
+      // visual feedback: mark correct/wrong
+      const opts = optionsEl.querySelectorAll('.option');
+      opts.forEach((o,ii)=>{
+        if(ii === correctIndex){ o.style.borderColor = 'rgba(22,163,74,0.12)'; o.style.boxShadow = '0 6px 18px rgba(16,185,129,0.06)'; }
+        if(ii === selected && ii !== correctIndex){ o.style.opacity = 0.6; }
+      });
+
+      // short delay so user sees feedback, then next
+      setTimeout(()=> nextQuestion(), 700);
+    }
+
+    function nextQuestion(){
+      idx++;
+      if(idx >= total){ finish(); return; }
+      // reset styles
+      renderQuestion();
+    }
+
+    function finish(){
+      quizArea.style.display='none'; result.style.display='flex';
+      finalScore.textContent = `${score} / ${total}`;
+      // message
+      let text=''; let emoji='';
+      const pct = Math.round(score/total*100);
+      if(pct === 100){ text='สมบูรณ์แบบ! คุณรู้เรื่อง AI ดีมาก 🎯'; emoji='🏆'; }
+      else if(pct >= 80){ text='ดีมาก! เข้าใจแนวคิดหลักของ AI 👍'; emoji='🎉'; }
+      else if(pct >= 50){ text='ดี ลองทบทวนเพิ่มอีกนิดเพื่อความเข้าใจที่ลึกขึ้น 😊'; emoji='🙂'; }
+      else{ text='อย่าท้อ—ลองอ่านเพิ่มเติมแล้วเล่นอีกครั้งนะ 📘'; emoji='💪'; }
+      resultText.textContent = text; resultEmoji.textContent = emoji;
+
+      // subtle confetti (simple) — create colored dots briefly
+      confettiBrief();
+
+      // reset progress to full
+      progressBar.style.width = '100%';
+    }
+
+    retryBtn.addEventListener('click', ()=>{
+      idx = 0; score = 0; quizArea.style.display='block'; result.style.display='none'; renderQuestion();
+    });
+
+    reviewBtn.addEventListener('click', ()=>{
+      // show all questions with correct answers
+      const list = questions.map((qq,i)=>`${i+1}. ${qq.q}\n- คำตอบที่ถูกต้อง: ${qq.options[qq.a]}`).join('\n\n');
+      alert('เฉลย:\n\n'+list);
+    });
+
+    function flashMessage(msg, ok=true){
+      // small native toast-like message
+      const t = document.createElement('div');
+      t.textContent = msg; t.style.position='fixed'; t.style.left='50%'; t.style.transform='translateX(-50%)';
+      t.style.bottom='28px'; t.style.padding='10px 14px'; t.style.borderRadius='10px'; t.style.boxShadow='var(--shadow)';
+      t.style.background = ok ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)'; t.style.color='var(--muted)';
+      document.body.appendChild(t);
+      setTimeout(()=> t.style.opacity='0',1400); setTimeout(()=> t.remove(),1800);
+    }
+
+    function confettiBrief(){
+      // create small colored circles that animate up and fade
+      const colors = ['#FF6B6B','#4ECDC4','#FFD93D','#8E44AD'];
+      const container = document.createElement('div'); container.style.position='fixed'; container.style.left=0; container.style.top=0; container.style.width='100%'; container.style.height='100%'; container.style.pointerEvents='none';
+      document.body.appendChild(container);
+      for(let i=0;i<18;i++){
+        const d = document.createElement('div'); d.style.position='absolute'; d.style.left=(20+Math.random()*60)+'%'; d.style.bottom='10%'; d.style.width='10px'; d.style.height='10px'; d.style.borderRadius='50%'; d.style.background=colors[i%colors.length]; d.style.opacity='0.95';
+        container.appendChild(d);
+        const dx = (Math.random()-0.5)*200; const dy = 300 + Math.random()*200;
+        d.animate([{transform:'translateY(0px) scale(1)',opacity:1},{transform:`translate(${dx}px,-${dy}px) scale(0.6)`,opacity:0}],{duration:1200+Math.random()*400,easing:'cubic-bezier(.2,.8,.2,1)'});
+      }
+      setTimeout(()=> container.remove(),1600);
+    }
+
+    // initialize
+    renderQuestion();
+
+    // Make sure audio context is resumed on touch (mobile browsers require gesture)
+    ['touchstart','click'].forEach(ev=>document.addEventListener(ev, ()=>{
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+    }, {once:true}));
+  </script>
+</body>
+</html>
